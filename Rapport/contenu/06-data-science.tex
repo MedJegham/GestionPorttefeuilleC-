@@ -1,0 +1,47 @@
+\chapter{Extension analytique et data science}
+\label{ch:ds}
+
+\section{Données d'entrée}
+
+L'analytique s'appuie sur \texttt{PriceHistory} : si aucun historique n'existe pour un actif, une série de prix est \textbf{simulée} (marche aléatoire bornée, graine dérivée du symbole) sur une fenêtre de jours configurable, afin de garantir des graphiques et des métriques en démonstration sans dépendre d'Internet.
+
+\section{Moyenne mobile simple (SMA)}
+
+Pour une fenêtre de $N$ jours (ex.\ $N=20$), la SMA au jour $t$ est la moyenne arithmétique des $N$ derniers prix de clôture :
+\begin{equation}
+  \mathrm{SMA}_N(t) = \frac{1}{N}\sum_{i=0}^{N-1} P_{t-i}.
+\end{equation}
+Un \textbf{signal de tendance} grossier compare le prix courant à la SMA (écart en pourcentage) : au-dessus (hausse), en dessous (baisse), zone neutre autour de zéro.
+
+\section{Volatilité}
+
+Les rendements journaliers sont définis par $r_t = \dfrac{P_t - P_{t-1}}{P_{t-1}}$. L'écart-type empirique $\hat{\sigma}$ des $r_t$ sur l'échantillon disponible est calculé (estimateur non biaisé avec dénominateur $n-1$). Une \textbf{volatilité annualisée approximative} est obtenue par
+\begin{equation}
+  \sigma_{\mathrm{ann}} \approx \hat{\sigma} \times \sqrt{252},
+\end{equation}
+en supposant $252$ jours de négociation par an (hypothèse standard en finance, ici à visée pédagogique).
+
+\section{Ratio de Sharpe simplifié}
+
+Sans taux sans risque explicite ($r_f = 0$), un indicateur \emph{Sharpe-like} annualisé est :
+\begin{equation}
+  S \approx \frac{\bar{r}}{\hat{\sigma}} \times \sqrt{252},
+\end{equation}
+où $\bar{r}$ est la moyenne des rendements journaliers. Ce rapport mesure le rendement moyen par unité de risque (écart-type) ; il doit être interprété avec prudence sur des séries courtes ou simulées.
+
+\section{Drawdown maximal}
+
+Sur la série de prix $(P_t)$, on suit le \emph{peak} courant et l'écart relatif au peak. Le drawdown au temps $t$ est $\dfrac{P_t - \mathrm{peak}_t}{\mathrm{peak}_t}$. Le \textbf{maximum drawdown} est le minimum (le plus négatif) de ces rapports, exprimé en valeur absolue en pourcentage pour l'affichage.
+
+\section{Backtest de règle SMA}
+
+À partir du jour où la SMA est disponible, une stratégie simplifiée :
+\begin{itemize}[leftmargin=*]
+  \item si le prix dépasse la SMA et qu'aucune position n'est détenue, investir la totalité du cash au prix du jour ;
+  \item si le prix passe sous la SMA et qu'une position est ouverte, tout liquider au prix du jour.
+\end{itemize}
+Le résultat est comparé à un \textbf{buy-and-hold} : investissement intégral au premier jour de la fenêtre utile, conservation jusqu'à la fin. Le nombre d'opérations de la stratégie est comptabilisé. Ce backtest illustre l'impact d'une règle technique sur un historique donné (sans frais, sans slippage --- limites à mentionner à l'oral).
+
+\section{Intérêt pour la note « créativité »}
+
+Ces éléments relient explicitement le projet à des notions de \textbf{statistique descriptive}, de \textbf{mesure du risque} et de \textbf{simulation décisionnelle}, tout en restant dans le périmètre du cours (.NET, LINQ, affichage Blazor).

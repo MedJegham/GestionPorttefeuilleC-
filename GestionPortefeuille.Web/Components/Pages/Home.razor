@@ -1,0 +1,234 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject IPortfolioService PortfolioService
+@inject IAnalyticsService AnalyticsService
+@inject IPortfolioAlertService AlertService
+
+<PageTitle>Dashboard</PageTitle>
+
+<h1 class="mb-3">Tableau de bord du portefeuille</h1>
+
+@if (snapshot is null)
+{
+    <p>Chargement...</p>
+}
+else
+{
+    @if (alerts.Count > 0)
+    {
+        <div class="mb-3">
+            @foreach (var alert in alerts)
+            {
+                <div class="alert @(AlertCss(alert.Severity)) mb-2 py-2" role="alert">
+                    <strong>@alert.Title</strong> — @alert.Message
+                </div>
+            }
+        </div>
+    }
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <div class="card p-3">
+                <div class="text-muted">Valeur totale</div>
+                <div class="kpi-value">@snapshot.TotalValue.ToString("C")</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3">
+                <div class="text-muted">Liquidite</div>
+                <div class="kpi-value">@snapshot.AvailableCash.ToString("C")</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3">
+                <div class="text-muted">Gain / Perte</div>
+                <div class="kpi-value @(snapshot.GainLoss >= 0 ? "text-success" : "text-danger")">@snapshot.GainLoss.ToString("C")</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3">
+                <div class="text-muted">ROI</div>
+                <div class="kpi-value @(snapshot.RoiPercent >= 0 ? "text-success" : "text-danger")">@snapshot.RoiPercent.ToString("N2")%</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-3 mb-3">
+        <h5 class="mb-3">Graphiques</h5>
+        <DashboardCharts PieLabels="pieLabels"
+                         PieValues="pieValues"
+                         LineLabels="lineLabels"
+                         LineValues="lineValues" />
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card p-3">
+                <div class="d-flex justify-content-between mb-2">
+                    <h5>Repartition du portefeuille</h5>
+                    <span class="text-muted small">@snapshot.Holdings.Count actifs detenus</span>
+                </div>
+                @if (snapshot.Holdings.Count == 0)
+                {
+                    <p class="text-muted mb-0">Aucune position ouverte.</p>
+                }
+                else
+                {
+                    <h6 class="text-muted small text-uppercase mb-2">Par actif</h6>
+                    @foreach (var h in snapshot.Holdings)
+                    {
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between">
+                                <span>@h.Symbol</span>
+                                <span>@h.AllocationPercent.ToString("N1")%</span>
+                            </div>
+                            <div class="progress" role="progressbar">
+                                <div class="progress-bar" style="width:@($"{Math.Max(2, h.AllocationPercent):N2}%")"></div>
+                            </div>
+                        </div>
+                    }
+
+                    <h6 class="text-muted small text-uppercase mt-3 mb-2">Par type d'actif</h6>
+                    @foreach (var kv in snapshot.AllocationByType)
+                    {
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between">
+                                <span>@kv.Key</span>
+                                <span>@kv.Value.ToString("N1")%</span>
+                            </div>
+                            <div class="progress" role="progressbar">
+                                <div class="progress-bar bg-info" style="width:@($"{Math.Max(2, kv.Value):N2}%")"></div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card p-3">
+                <div class="d-flex justify-content-between mb-2">
+                    <h5>Analyse Data Science</h5>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="ReloadAsync">Actualiser</button>
+                </div>
+                @if (analytics.Count == 0)
+                {
+                    <p class="text-muted mb-0">Pas encore de donnees analytiques.</p>
+                }
+                else
+                {
+                    @foreach (var item in analytics)
+                    {
+                        <div class="border rounded p-2 mb-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>@item.Symbol</strong>
+                                <span class="tag-signal @SignalClass(item.Signal)">@item.Signal</span>
+                            </div>
+                            <div class="small text-muted">SMA(20): @item.SimpleMovingAverage.ToString("C")</div>
+                            <div class="small text-muted">Vol. ann. approx.: @item.VolatilityPercent.ToString("N2")%</div>
+                            <div class="small text-muted">Sharpe-like (ann.): @item.SharpeLikeAnnualized.ToString("N2")</div>
+                            <div class="small text-muted">Max drawdown: @item.MaxDrawdownPercent.ToString("N2")%</div>
+                            <div class="small @(item.DistanceToSmaPercent >= 0 ? "text-success" : "text-danger")">
+                                Ecart au SMA: @item.DistanceToSmaPercent.ToString("N2")%
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-1">
+        <div class="col-12">
+            <div class="card p-3">
+                <h5 class="mb-3">Performance par actif (CMP / cout moyen pondere)</h5>
+                @if (snapshot.Holdings.Count == 0)
+                {
+                    <p class="text-muted mb-0">Aucune position pour calculer la performance.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Symbole</th>
+                                    <th class="text-end">Quantite</th>
+                                    <th class="text-end">CMP</th>
+                                    <th class="text-end">Cout de revient</th>
+                                    <th class="text-end">Cours</th>
+                                    <th class="text-end">Valorisation</th>
+                                    <th class="text-end">Gain / Perte</th>
+                                    <th class="text-end">Poids</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var h in snapshot.Holdings)
+                                {
+                                    <tr>
+                                        <td><strong>@h.Symbol</strong> <span class="text-muted small">@h.Name</span></td>
+                                        <td class="text-end">@h.Quantity.ToString("N4")</td>
+                                        <td class="text-end">@h.AverageBuyPrice.ToString("C")</td>
+                                        <td class="text-end">@h.CostBasis.ToString("C")</td>
+                                        <td class="text-end">@h.CurrentPrice.ToString("C")</td>
+                                        <td class="text-end">@h.MarketValue.ToString("C")</td>
+                                        <td class="text-end @(h.GainLoss >= 0 ? "text-success" : "text-danger")">@h.GainLoss.ToString("C")</td>
+                                        <td class="text-end">@h.AllocationPercent.ToString("N1")%</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private PortfolioSnapshot? snapshot;
+    private List<AssetAnalytics> analytics = [];
+    private List<PortfolioAlert> alerts = [];
+    private List<string> pieLabels = [];
+    private List<decimal> pieValues = [];
+    private List<string> lineLabels = [];
+    private List<decimal> lineValues = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        await AnalyticsService.EnsurePriceHistorySeedAsync();
+        snapshot = await PortfolioService.GetSnapshotAsync();
+        if (snapshot is not null)
+        {
+            await PortfolioService.RecordDailyPortfolioValueAsync(snapshot.TotalValue);
+        }
+
+        analytics = await AnalyticsService.GetAssetAnalyticsAsync();
+        alerts = (await AlertService.GetAlertsAsync()).ToList();
+
+        pieLabels = snapshot?.Holdings.Select(h => h.Symbol).ToList() ?? [];
+        pieValues = snapshot?.Holdings.Select(h => h.MarketValue).ToList() ?? [];
+
+        var hist = await PortfolioService.GetPortfolioValueHistoryAsync(180);
+        lineLabels = hist.Select(p => p.Date.ToString("yyyy-MM-dd")).ToList();
+        lineValues = hist.Select(p => p.TotalValue).ToList();
+    }
+
+    private static string SignalClass(TrendSignal signal) => signal switch
+    {
+        TrendSignal.Bullish => "bg-success-subtle text-success",
+        TrendSignal.Bearish => "bg-danger-subtle text-danger",
+        _ => "bg-secondary-subtle text-secondary"
+    };
+
+    private static string AlertCss(AlertSeverity s) => s switch
+    {
+        AlertSeverity.Danger => "alert-danger",
+        AlertSeverity.Warning => "alert-warning",
+        _ => "alert-info"
+    };
+}

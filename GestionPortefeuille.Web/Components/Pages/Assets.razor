@@ -1,0 +1,220 @@
+@page "/assets"
+@rendermode InteractiveServer
+@inject IAssetService AssetService
+
+<PageTitle>Actifs</PageTitle>
+
+<h1 class="mb-3">Gestion des actifs</h1>
+
+<div class="card p-3 mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-5">
+            <label class="form-label">Recherche (debounce ~400 ms)</label>
+            <input class="form-control" value="@searchDraft" @oninput="OnSearchInput" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Type</label>
+            <select class="form-select" @bind="typeFilter" @bind:after="OnFilterChanged">
+                <option value="">Tous</option>
+                <option value="Stock">Stock</option>
+                <option value="Crypto">Crypto</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Tri</label>
+            <select class="form-select" @bind="sortBy" @bind:after="OnFilterChanged">
+                <option value="symbol">Symbole</option>
+                <option value="name">Nom</option>
+                <option value="type">Type</option>
+                <option value="price">Prix</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label d-block">Ordre</label>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" @bind="sortDesc" @bind:after="OnFilterChanged" id="sortDesc" />
+                <label class="form-check-label" for="sortDesc">Decroissant</label>
+            </div>
+        </div>
+    </div>
+    <div class="row g-2 mt-2 align-items-end">
+        <div class="col-md-2">
+            <button class="btn btn-primary w-100" @onclick="() => LoadPageAsync(1)">Appliquer</button>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-outline-secondary w-100" @onclick="ResetForm">Nouveau</button>
+        </div>
+    </div>
+</div>
+
+<div class="card p-3 mb-3">
+    <EditForm Model="assetForm" OnValidSubmit="SaveAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="row g-2">
+            <div class="col-md-3">
+                <label class="form-label">Symbole</label>
+                <InputText class="form-control" @bind-Value="assetForm.Symbol" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Nom</label>
+                <InputText class="form-control" @bind-Value="assetForm.Name" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Type</label>
+                <InputSelect class="form-select" @bind-Value="assetForm.AssetType">
+                    @foreach (var type in Enum.GetValues<AssetType>())
+                    {
+                        <option value="@type">@type</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Prix actuel</label>
+                <InputNumber class="form-control" @bind-Value="assetForm.CurrentPrice" />
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-success w-100" type="submit">@((assetForm.Id == 0) ? "Ajouter" : "Mettre a jour")</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+<div class="card p-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <span class="text-muted small">@totalCount actif(s) — @($"Page {page} / {totalPages}")</span>
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary" disabled="@(page <= 1)" @onclick="() => LoadPageAsync(page - 1)">Prec.</button>
+            <button class="btn btn-outline-secondary" disabled="@(page >= totalPages)" @onclick="() => LoadPageAsync(page + 1)">Suiv.</button>
+        </div>
+    </div>
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Symbole</th>
+                <th>Nom</th>
+                <th>Type</th>
+                <th>Prix</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var asset in pageItems)
+            {
+                <tr>
+                    <td><strong>@asset.Symbol</strong></td>
+                    <td>@asset.Name</td>
+                    <td>@asset.AssetType</td>
+                    <td>@asset.CurrentPrice.ToString("C")</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => Edit(asset)">Editer</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(asset.Id)">Supprimer</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private const int PageSize = 8;
+
+    private string? search;
+    private string? searchDraft;
+    private string? typeFilter;
+    private string sortBy = "symbol";
+    private bool sortDesc;
+    private int page = 1;
+    private int totalCount;
+    private int totalPages => Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
+    private List<Asset> pageItems = [];
+    private Asset assetForm = new() { AssetType = AssetType.Stock, CurrentPrice = 100m };
+    private CancellationTokenSource? _searchDebounceCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        searchDraft = search;
+        await LoadPageAsync(1);
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchDraft = e.Value?.ToString();
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var token = _searchDebounceCts.Token;
+        try
+        {
+            await Task.Delay(400, token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        search = searchDraft;
+        await InvokeAsync(async () =>
+        {
+            await LoadPageAsync(1);
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnFilterChanged()
+    {
+        await LoadPageAsync(1);
+    }
+
+    private async Task LoadPageAsync(int newPage)
+    {
+        page = Math.Max(1, newPage);
+        var result = await AssetService.GetPagedAsync(search, typeFilter, page, PageSize, sortBy, sortDesc);
+        pageItems = result.Items;
+        totalCount = result.TotalCount;
+        if (page > totalPages && totalPages > 0)
+        {
+            page = totalPages;
+            result = await AssetService.GetPagedAsync(search, typeFilter, page, PageSize, sortBy, sortDesc);
+            pageItems = result.Items;
+        }
+    }
+
+    private void Edit(Asset asset)
+    {
+        assetForm = new Asset
+        {
+            Id = asset.Id,
+            Symbol = asset.Symbol,
+            Name = asset.Name,
+            AssetType = asset.AssetType,
+            CurrentPrice = asset.CurrentPrice
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        if (assetForm.Id == 0)
+        {
+            await AssetService.CreateAsync(assetForm);
+        }
+        else
+        {
+            await AssetService.UpdateAsync(assetForm);
+        }
+
+        ResetForm();
+        await LoadPageAsync(page);
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        await AssetService.DeleteAsync(id);
+        await LoadPageAsync(page);
+    }
+
+    private void ResetForm()
+    {
+        assetForm = new Asset { AssetType = AssetType.Stock, CurrentPrice = 100m };
+    }
+}

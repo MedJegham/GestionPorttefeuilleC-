@@ -1,0 +1,229 @@
+@page "/transactions"
+@rendermode InteractiveServer
+@inject ITransactionService TransactionService
+@inject IAssetService AssetService
+@inject IPortfolioService PortfolioService
+
+<PageTitle>Transactions</PageTitle>
+
+<h1 class="mb-3">Transactions</h1>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert @(isSuccess ? "alert-success" : "alert-danger")">@statusMessage</div>
+}
+
+<div class="card p-3 mb-3">
+    <h5>Budget d'investissement</h5>
+    <div class="row g-2">
+        <div class="col-md-4"><div class="text-muted small">Budget initial</div><div class="fw-bold">@budget.InitialBudget.ToString("C")</div></div>
+        <div class="col-md-4"><div class="text-muted small">Liquidite disponible</div><div class="fw-bold">@budget.AvailableCash.ToString("C")</div></div>
+        <div class="col-md-4"><div class="text-muted small">Valeur totale</div><div class="fw-bold">@snapshot.TotalValue.ToString("C")</div></div>
+    </div>
+</div>
+
+<div class="card p-3 mb-3">
+    <EditForm Model="transactionForm" OnValidSubmit="SaveAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="row g-2">
+            <div class="col-md-3">
+                <label class="form-label">Actif</label>
+                <InputSelect class="form-select" @bind-Value="transactionForm.AssetId">
+                    <option value="0">Choisir...</option>
+                    @foreach (var asset in assets)
+                    {
+                        <option value="@asset.Id">@asset.Symbol - @asset.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Type</label>
+                <InputSelect class="form-select" @bind-Value="transactionForm.Type">
+                    <option value="@TransactionType.Buy">Buy</option>
+                    <option value="@TransactionType.Sell">Sell</option>
+                </InputSelect>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Quantite</label>
+                <InputNumber class="form-control" @bind-Value="transactionForm.Quantity" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Prix unitaire</label>
+                <InputNumber class="form-control" @bind-Value="transactionForm.UnitPrice" />
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button class="btn btn-primary w-100" type="submit">Enregistrer transaction</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+<div class="card p-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div>
+            <h5 class="mb-0 d-inline">Historique des operations</h5>
+            <span class="text-muted small ms-2">@totalCount operation(s) — @($"Page {page} / {totalPages}")</span>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <select class="form-select form-select-sm" style="width: auto;" @bind="sortBy" @bind:after="() => LoadPageAsync(1)">
+                <option value="date">Date</option>
+                <option value="symbol">Symbole</option>
+                <option value="amount">Montant</option>
+                <option value="type">Type</option>
+            </select>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" @bind="sortDesc" @bind:after="() => LoadPageAsync(1)" id="txSortDesc" />
+                <label class="form-check-label small" for="txSortDesc">Decroissant</label>
+            </div>
+            @if (!string.IsNullOrEmpty(csvDownloadHref))
+            {
+                <a class="btn btn-sm btn-outline-secondary" href="@csvDownloadHref" download="transactions.csv">Exporter CSV</a>
+            }
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" disabled="@(page <= 1)" @onclick="() => LoadPageAsync(page - 1)">Prec.</button>
+                <button class="btn btn-outline-secondary" disabled="@(page >= totalPages)" @onclick="() => LoadPageAsync(page + 1)">Suiv.</button>
+            </div>
+        </div>
+    </div>
+    <table class="table table-sm table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Actif</th>
+                <th>Type</th>
+                <th>Qte</th>
+                <th>Prix</th>
+                <th>Montant</th>
+                <th class="text-end">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var t in pageItems)
+            {
+                <tr>
+                    <td>@t.Date.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                    <td>@t.Asset?.Symbol</td>
+                    <td>
+                        <span class="badge @(t.Type == TransactionType.Buy ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning")">
+                            @t.Type
+                        </span>
+                    </td>
+                    <td>@t.Quantity</td>
+                    <td>@t.UnitPrice.ToString("C")</td>
+                    <td>@t.TotalAmount.ToString("C")</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(t.Id)">Supprimer</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private const int PageSize = 10;
+
+    private List<Asset> assets = [];
+    private List<Transaction> allTransactionsExport = [];
+    private List<Transaction> pageItems = [];
+    private int totalCount;
+    private int page = 1;
+    private int totalPages => Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
+    private string sortBy = "date";
+    private bool sortDesc = true;
+    private PortfolioBudget budget = new();
+    private PortfolioSnapshot snapshot = new();
+    private bool isSuccess;
+    private string? statusMessage;
+    private string? csvDownloadHref;
+
+    private Transaction transactionForm = new()
+    {
+        Type = TransactionType.Buy,
+        Quantity = 1,
+        UnitPrice = 100,
+        Date = DateTime.UtcNow
+    };
+
+    protected override async Task OnInitializedAsync() => await LoadAllAsync();
+
+    private async Task LoadAllAsync()
+    {
+        assets = await AssetService.GetAllAsync();
+        budget = await PortfolioService.GetBudgetAsync();
+        snapshot = await PortfolioService.GetSnapshotAsync();
+        allTransactionsExport = await TransactionService.GetAllAsync();
+        await LoadPageAsync(page);
+        BuildCsvHref();
+    }
+
+    private async Task LoadPageAsync(int newPage)
+    {
+        page = Math.Max(1, newPage);
+        var result = await TransactionService.GetPagedAsync(page, PageSize, sortBy, sortDesc, null);
+        pageItems = result.Items;
+        totalCount = result.TotalCount;
+        if (page > totalPages && totalPages > 0)
+        {
+            page = totalPages;
+            result = await TransactionService.GetPagedAsync(page, PageSize, sortBy, sortDesc, null);
+            pageItems = result.Items;
+        }
+    }
+
+    private void BuildCsvHref()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("Date;Symbole;Type;Quantite;PrixUnitaire;MontantTotal");
+        foreach (var t in allTransactionsExport.OrderByDescending(x => x.Date))
+        {
+            sb.Append(t.Date.ToUniversalTime().ToString("yyyy-MM-dd HH:mm"));
+            sb.Append(';');
+            sb.Append(t.Asset?.Symbol ?? string.Empty);
+            sb.Append(';');
+            sb.Append(t.Type);
+            sb.Append(';');
+            sb.Append(t.Quantity.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            sb.Append(';');
+            sb.Append(t.UnitPrice.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            sb.Append(';');
+            sb.AppendLine(t.TotalAmount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        csvDownloadHref = "data:text/csv;charset=utf-8," + Uri.EscapeDataString(sb.ToString());
+    }
+
+    private async Task SaveAsync()
+    {
+        if (transactionForm.AssetId <= 0)
+        {
+            isSuccess = false;
+            statusMessage = "Veuillez choisir un actif.";
+            return;
+        }
+
+        var result = await TransactionService.CreateAsync(transactionForm);
+        isSuccess = result.Success;
+        statusMessage = result.Message;
+
+        if (result.Success)
+        {
+            transactionForm = new Transaction
+            {
+                Type = TransactionType.Buy,
+                Quantity = 1,
+                UnitPrice = 100,
+                Date = DateTime.UtcNow
+            };
+        }
+
+        await LoadAllAsync();
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        await TransactionService.DeleteAsync(id);
+        await LoadAllAsync();
+    }
+}

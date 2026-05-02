@@ -1,0 +1,30 @@
+\chapter{Modèle de données et persistance}
+\label{ch:donnees}
+
+\section{Entités principales}
+
+\begin{description}
+  \item[\texttt{Asset}] Représente un instrument : symbole (unique), nom, type (\texttt{Stock} / \texttt{Crypto}), prix courant. Collections de navigation vers les transactions et l'historique de prix.
+  \item[\texttt{Transaction}] Mouvement d'achat ou de vente : quantité, prix unitaire, date, montant total dérivé ; clé étrangère vers \texttt{Asset}.
+  \item[\texttt{PriceHistory}] Série temporelle de clôtures simulées ou issues d'une évolution de marché ; contrainte d'unicité \((\texttt{AssetId}, \texttt{Date})\).
+  \item[\texttt{PortfolioBudget}] Budget initial et liquidité disponible (mise à jour lors des opérations).
+  \item[\texttt{PortfolioValuePoint}] Valeur totale du portefeuille (cash + positions au cours du jour) pour une date donnée ; index unique sur la date.
+\end{description}
+
+\section{Relations et intégrité}
+
+Les relations \texttt{Asset} $\rightarrow$ \texttt{Transaction} et \texttt{Asset} $\rightarrow$ \texttt{PriceHistory} sont en \textbf{one-to-many} avec suppression en cascade côté dépendant, configurées dans \texttt{OnModelCreating}. L'index unique sur \texttt{Asset.Symbol} garantit l'absence de doublons de tickers.
+
+\section{Migrations}
+
+Les migrations EF Core sont stockées dans \texttt{GestionPortefeuille.Infrastructure/Migrations/}, notamment :
+\begin{itemize}[leftmargin=*]
+  \item création initiale des tables (\texttt{InitialCreate}) ;
+  \item ajout de \texttt{PortfolioValuePoints} (\texttt{AddPortfolioValuePoint}).
+\end{itemize}
+
+Au démarrage de l'application, \texttt{Database.Migrate()} applique automatiquement les migrations en attente, ce qui facilite la démonstration sur une machine neuve. Un \emph{seed} insère un budget par défaut et des actifs de démonstration si la base est vide.
+
+\section{Choix SQLite}
+
+SQLite convient à un projet étudiant : fichier unique, pas de serveur à installer, sauvegarde du dépôt possible en excluant \texttt{*.db} via \texttt{.gitignore}. Pour une mise en production, une base serveur (PostgreSQL, SQL Server) serait préférable (concurrence, sauvegardes, taille).

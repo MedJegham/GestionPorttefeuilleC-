@@ -1,0 +1,55 @@
+\chapter{Annexe A — Extraits de code significatifs}
+\label{ann:code}
+
+\section{Point d'entrée et migrations (\texttt{Program.cs})}
+
+\begin{lstlisting}[language=CSharp, caption={\texttt{GestionPortefeuille.Web/Program.cs} (structure principale)}]
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddPortfolioServices(builder.Configuration);
+
+var app = builder.Build();
+// ... pipeline HTTP (fichiers statiques, antiforgery, Razor Components) ...
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+    await DbInitializer.SeedAsync(db);
+}
+
+app.Run();
+\end{lstlisting}
+
+\section{Injection de dépendances (\texttt{AddPortfolioServices})}
+
+\begin{lstlisting}[language=CSharp, caption={\texttt{GestionPortefeuille.Services/ServiceCollectionExtensions.cs}}]
+public static IServiceCollection AddPortfolioServices(
+    this IServiceCollection services, IConfiguration configuration)
+{
+    services.Configure<AlertOptions>(configuration.GetSection(AlertOptions.SectionName));
+    services.Configure<PriceDataOptions>(configuration.GetSection(PriceDataOptions.SectionName));
+
+    services.AddMemoryCache();
+    services.AddHttpClient<IPriceDataService, PriceDataService>(client =>
+    {
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("GestionPortefeuille/1.0 (demo)");
+        client.Timeout = TimeSpan.FromSeconds(20);
+    });
+
+    services.AddScoped<IAssetService, AssetService>();
+    services.AddScoped<ITransactionService, TransactionService>();
+    services.AddScoped<IPortfolioService, PortfolioService>();
+    services.AddScoped<IAnalyticsService, AnalyticsService>();
+    services.AddScoped<IPortfolioAlertService, PortfolioAlertService>();
+    return services;
+}
+\end{lstlisting}
+
+\section{Lecture complémentaire}
+
+Les entités et interfaces se trouvent dans \texttt{GestionPortefeuille.Core}, le \texttt{DbContext} et les migrations dans \texttt{GestionPortefeuille.Infrastructure}, les pages Blazor sous \texttt{GestionPortefeuille.Web/Components}. Un diagramme de classes Mermaid est fourni à la racine du dépôt dans \texttt{DiagrammeClasses.md}.

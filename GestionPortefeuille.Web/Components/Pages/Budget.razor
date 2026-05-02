@@ -1,0 +1,47 @@
+@page "/budget"
+@rendermode InteractiveServer
+@inject IPortfolioService PortfolioService
+
+<PageTitle>Budget</PageTitle>
+
+<h1 class="mb-3">Budget d'investissement</h1>
+
+<p class="text-muted">Ajustez le budget de reference et la liquidite disponible (utile pour une demo ou une reinitialisation).</p>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success">@statusMessage</div>
+}
+
+<div class="card p-3" style="max-width: 520px;">
+    <EditForm Model="model" OnValidSubmit="SaveAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="mb-3">
+            <label class="form-label">Budget initial</label>
+            <InputNumber class="form-control" @bind-Value="model.InitialBudget" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Liquidite disponible</label>
+            <InputNumber class="form-control" @bind-Value="model.AvailableCash" />
+        </div>
+        <button class="btn btn-primary" type="submit">Enregistrer</button>
+    </EditForm>
+</div>
+
+@code {
+    private PortfolioBudget model = new();
+    private string? statusMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        model = await PortfolioService.GetBudgetAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        await PortfolioService.UpdateBudgetAsync(model.InitialBudget, model.AvailableCash);
+        model = await PortfolioService.GetBudgetAsync();
+        statusMessage = "Budget mis a jour.";
+    }
+}

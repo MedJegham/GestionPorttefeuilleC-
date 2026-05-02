@@ -1,0 +1,81 @@
+@rendermode InteractiveServer
+@inject IJSRuntime Js
+<div class="row g-3">
+    <div class="col-lg-6">
+        <h6 class="text-muted small text-uppercase mb-2">Repartition (valorisation)</h6>
+        @if (PieLabels.Count == 0)
+        {
+            <p class="text-muted small mb-0">Pas assez de donnees pour le graphique.</p>
+        }
+        else
+        {
+            <div style="max-height: 280px;">
+                <canvas id="@PieCanvasId"></canvas>
+            </div>
+        }
+    </div>
+    <div class="col-lg-6">
+        <h6 class="text-muted small text-uppercase mb-2">Valeur totale (historique enregistre)</h6>
+        @if (LineLabels.Count < 2)
+        {
+            <p class="text-muted small mb-0">Historique insuffisant (enregistre automatiquement apres transactions / visite du dashboard).</p>
+        }
+        else
+        {
+            <div style="max-height: 280px;">
+                <canvas id="@LineCanvasId"></canvas>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private const string PieCanvasId = "portfolioPieChart";
+    private const string LineCanvasId = "portfolioLineChart";
+
+    [Parameter]
+    public List<string> PieLabels { get; set; } = new();
+
+    [Parameter]
+    public List<decimal> PieValues { get; set; } = new();
+
+    [Parameter]
+    public List<string> LineLabels { get; set; } = new();
+
+    [Parameter]
+    public List<decimal> LineValues { get; set; } = new();
+
+    private bool _chartsRendered;
+
+    protected override void OnParametersSet()
+    {
+        _chartsRendered = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_chartsRendered)
+        {
+            return;
+        }
+
+        try
+        {
+            if (PieLabels.Count > 0 && PieValues.Count > 0 && PieLabels.Count == PieValues.Count)
+            {
+                await Js.InvokeVoidAsync("portfolioCharts.renderPie", PieCanvasId, PieLabels, PieValues);
+            }
+
+            if (LineLabels.Count >= 2 && LineValues.Count >= 2 && LineLabels.Count == LineValues.Count)
+            {
+                await Js.InvokeVoidAsync("portfolioCharts.renderLine", LineCanvasId, LineLabels, LineValues);
+            }
+
+            _chartsRendered = true;
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit ferme
+        }
+    }
+}

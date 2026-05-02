@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="GestionPortefeuille.Core/GestionPortefeuille.Core.csproj" />
+  <Project Path="GestionPortefeuille.Infrastructure/GestionPortefeuille.Infrastructure.csproj" />
+  <Project Path="GestionPortefeuille.Services/GestionPortefeuille.Services.csproj" />
+  <Project Path="GestionPortefeuille.Web/GestionPortefeuille.Web.csproj" />
+</Solution>

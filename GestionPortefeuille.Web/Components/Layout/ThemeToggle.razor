@@ -1,0 +1,31 @@
+@rendermode InteractiveServer
+@inject IJSRuntime Js
+
+<button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ToggleAsync" title="Basculer le theme">
+    @ButtonLabel
+</button>
+
+@code {
+    private string ButtonLabel { get; set; } = "Theme";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await SyncLabelAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleAsync()
+    {
+        var next = await Js.InvokeAsync<string>("themeInterop.toggle");
+        ButtonLabel = next == "dark" ? "Mode clair" : "Mode sombre";
+    }
+
+    private async Task SyncLabelAsync()
+    {
+        var cur = await Js.InvokeAsync<string>("themeInterop.current");
+        ButtonLabel = cur == "dark" ? "Mode clair" : "Mode sombre";
+    }
+}

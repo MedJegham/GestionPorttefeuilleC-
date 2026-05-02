@@ -1,0 +1,32 @@
+\chapter{Introduction}
+
+\section{Contexte}
+
+La gestion d'un portefeuille d'investissement (actions, crypto-actifs) nécessite le suivi des positions, des liquidités, des opérations d'achat et de vente, ainsi que des indicateurs de performance. Dans le cadre d'un cours sur le développement d'applications Web avec \emph{.NET}, le présent projet met en œuvre une solution complète répondant à un cahier des charges imposant notamment Blazor, Entity Framework Core, une architecture propre, un tableau de bord analytique et l'utilisation de l'asynchronisme.
+
+\section{Objectifs du projet}
+
+Les objectifs principaux sont les suivants :
+\begin{itemize}[leftmargin=*]
+  \item proposer une interface Web permettant la \textbf{gestion des actifs} et la \textbf{saisie des transactions} (achat / vente) avec validation ;
+  \item suivre un \textbf{budget d'investissement} et l'\textbf{historique des opérations} ;
+  \item afficher un \textbf{tableau de bord} avec valeur du portefeuille, gain / perte, répartition par actif et par type, et des graphiques ;
+  \item intégrer une \textbf{extension analytique} (créativité) : indicateurs statistiques sur l'historique de prix, aide à la décision, backtest simple ;
+  \item respecter une \textbf{architecture en couches} et des bonnes pratiques (séparation UI / services / accès données).
+\end{itemize}
+
+\section{Périmètre technique}
+
+Le dépôt logiciel est organisé en plusieurs projets au sein d'une solution \texttt{.slnx} :
+\begin{description}
+  \item[\texttt{GestionPortefeuille.Core}] Entités, énumérations, modèles de projection (DTO), interfaces de services, options de configuration.
+  \item[\texttt{GestionPortefeuille.Infrastructure}] \texttt{DbContext}, migrations EF Core, initialisation des données (\emph{seed}).
+  \item[\texttt{GestionPortefeuille.Services}] Implémentations des services (portefeuille, transactions, actifs, analytique, alertes, prix marché).
+  \item[\texttt{GestionPortefeuille.Web}] Application Blazor, pages, composants, fichiers statiques, configuration.
+\end{description}
+
+La base de données relationnelle est \textbf{SQLite} (fichier \texttt{portfolio.db}), choix adapté à un rendu académique (portabilité, déploiement simple).
+
+\section{Organisation du rapport}
+
+Le chapitre~\ref{ch:exigences} rappelle les exigences du cours et la cartographie fonctionnelle. Le chapitre~\ref{ch:arch} décrit l'architecture logicielle. Le chapitre~\ref{ch:donnees} présente le modèle de données et les migrations. Le chapitre~\ref{ch:real} détaille la réalisation (services, asynchronisme, validation). Le chapitre~\ref{ch:ds} expose l'extension \emph{data science}. Le chapitre~\ref{ch:ui} concerne l'interface utilisateur. Le chapitre~\ref{ch:val} résume la validation. Les annexes fournissent des extraits de code et les commandes utiles.

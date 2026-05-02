@@ -1,0 +1,88 @@
+% =============================================================================
+% RAPPORT — Application Web de gestion de portefeuille d'investissement
+% Projet : GestionPortefeuille (Blazor + EF Core + SQLite)
+% Compilation : pdflatex (2 passes) ou latexmk -pdf rapport.tex
+% Prérequis : distribution TeX (TeX Live, MiKTeX) avec babel-french
+% =============================================================================
+\documentclass[11pt,a4paper]{report}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[french]{babel}
+\usepackage{microtype}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{url}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+
+% --- Listings C# (approximatif) ---
+\lstdefinelanguage{CSharp}{
+  morekeywords={abstract,as,async,await,base,bool,break,byte,case,catch,char,checked,class,const,continue,decimal,default,delegate,do,double,else,enum,event,explicit,extern,false,finally,fixed,float,for,foreach,goto,if,implicit,in,int,interface,internal,is,lock,long,namespace,new,null,object,operator,out,override,params,private,protected,public,readonly,ref,return,sbyte,sealed,short,sizeof,stackalloc,static,string,struct,switch,this,throw,true,try,typeof,uint,ulong,unchecked,unsafe,ushort,using,virtual,void,volatile,while,add,alias,ascending,descending,dynamic,from,get,global,group,into,join,let,orderby,partial,remove,select,set,value,var,where,yield},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+}
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{teal},
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  showstringspaces=false
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Gestion de portefeuille}
+\fancyhead[R]{\small Rapport technique}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\title{\textbf{Application Web de gestion\\d'un portefeuille d'investissement}\\[0.5em]\large Blazor Server, Entity Framework Core, architecture en couches}
+\author{Équipe / Mohamed Jegham & Louay Ben Mansour — Polytech\\Semestre 4 — .NET / C\#}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+\noindent
+Ce document présente la conception et la réalisation d'une application Web complète de \emph{gestion de portefeuille} (actifs financiers, transactions, budget, tableau de bord analytique). L'implémentation repose sur \textbf{.NET~8}, \textbf{Blazor Web App} (mode interactif serveur), \textbf{Entity Framework Core} en approche \emph{Code First} avec base \textbf{SQLite}, et une architecture découpée en couches (\textbf{Core}, \textbf{Infrastructure}, \textbf{Services}, \textbf{Web}). Une extension de type \emph{data science} complète les indicateurs classiques : volatilité des rendements, moyenne mobile (SMA), ratio de Sharpe simplifié, drawdown maximal, backtest de règle de tendance, alertes et graphiques (\emph{Chart.js}). Le rapport détaille les exigences pédagogiques, le modèle de données, les services métier et les pistes d'évolution.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+\input{contenu/01-introduction}
+\input{contenu/02-exigences}
+\input{contenu/03-architecture}
+\input{contenu/04-donnees}
+\input{contenu/05-realisation}
+\input{contenu/06-data-science}
+\input{contenu/07-interface}
+\input{contenu/08-validation}
+\input{contenu/09-conclusion}
+
+\appendix
+\input{contenu/annexe-code}
+\input{contenu/annexe-commandes}
+
+\end{document}

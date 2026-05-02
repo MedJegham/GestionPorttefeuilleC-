@@ -1,0 +1,166 @@
+@page "/tools"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Configuration
+@inject IPriceDataService PriceDataService
+@inject IAnalyticsService AnalyticsService
+@inject IAssetService AssetService
+@inject IConfiguration Configuration
+
+<PageTitle>Outils</PageTitle>
+
+<h1 class="mb-3">Outils marches et backtest</h1>
+
+<div class="card p-3 mb-3">
+    <h5>Configuration</h5>
+    <ul class="small text-muted mb-0">
+        <li><strong>PriceData:Mode</strong> = <code>@Configuration["PriceData:Mode"]</code> — <em>Simulated</em> (defaut), <em>Api</em> (Finnhub + CoinGecko), <em>None</em>.</li>
+        <li>Actions : renseignez <code>PriceData:FinnhubApiKey</code> dans <code>appsettings.json</code> (compte gratuit sur finnhub.io).</li>
+        <li>Crypto : BTC, ETH, SOL, ADA, DOT sont mappees vers CoinGecko (sans cle).</li>
+    </ul>
+</div>
+
+<div class="card p-3 mb-3">
+    <h5 class="mb-2">Rafraichir les cours (API)</h5>
+    <p class="small text-muted">Respecte le cache (minutes) configure dans <code>PriceData:CacheMinutes</code>.</p>
+    @if (!string.IsNullOrEmpty(priceMessage))
+    {
+        <div class="alert alert-info small">@priceMessage</div>
+    }
+    <button class="btn btn-primary" type="button" disabled="@priceBusy" @onclick="RefreshPricesAsync">
+        @(priceBusy ? "En cours..." : "Rafraichir via API")
+    </button>
+</div>
+
+<div class="card p-3 mb-3">
+    <h5 class="mb-2">Import CSV des prix</h5>
+    <p class="small text-muted">Une ligne par actif : <code>Symbole;Prix</code> ou <code>Symbol,Price</code>. Le symbole doit exister.</p>
+    <textarea class="form-control font-monospace small mb-2" rows="6" @bind="csvText" placeholder="AAPL;190.5&#10;BTC;62000"></textarea>
+    @if (!string.IsNullOrEmpty(csvMessage))
+    {
+        <div class="alert @(csvError ? "alert-danger" : "alert-success") small">@csvMessage</div>
+    }
+    <button class="btn btn-outline-primary" type="button" disabled="@csvBusy" @onclick="ImportCsvAsync">
+        @(csvBusy ? "Import..." : "Importer")
+    </button>
+</div>
+
+<div class="card p-3">
+    <h5 class="mb-2">Backtest SMA (regle simple)</h5>
+    <p class="small text-muted">@BacktestRuleText</p>
+    <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label">Actif</label>
+            <InputSelect class="form-select" @bind-Value="backtestAssetId">
+                <option value="0">Choisir...</option>
+                @foreach (var a in allAssets)
+                {
+                    <option value="@a.Id">@a.Symbol</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Periode SMA</label>
+            <InputNumber class="form-control" @bind-Value="smaPeriod" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Capital initial</label>
+            <InputNumber class="form-control" @bind-Value="initialCash" />
+        </div>
+        <div class="col-md-3">
+            <button class="btn btn-success w-100" type="button" disabled="@backtestBusy" @onclick="RunBacktestAsync">
+                @(backtestBusy ? "Calcul..." : "Lancer")
+            </button>
+        </div>
+    </div>
+    @if (backtestResult is not null)
+    {
+        <hr />
+        <dl class="row small mb-0">
+            <dt class="col-sm-4">Strategie (fin)</dt>
+            <dd class="col-sm-8">@backtestResult.FinalStrategyEquity.ToString("C") (@backtestResult.TradeCount operations)</dd>
+            <dt class="col-sm-4">Buy &amp; hold (fin)</dt>
+            <dd class="col-sm-8">@backtestResult.FinalBuyHoldEquity.ToString("C")</dd>
+        </dl>
+    }
+</div>
+
+@code {
+    private const string BacktestRuleText = "Achat 100 % du cash si cours > SMA, vente totale si cours < SMA (a partir du jour ou la SMA est disponible).";
+
+    private List<Asset> allAssets = [];
+    private string? priceMessage;
+    private bool priceBusy;
+    private string csvText = string.Empty;
+    private string? csvMessage;
+    private bool csvError;
+    private bool csvBusy;
+    private int backtestAssetId;
+    private int smaPeriod = 20;
+    private decimal initialCash = 10_000m;
+    private BacktestResult? backtestResult;
+    private bool backtestBusy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        allAssets = await AssetService.GetAllAsync();
+    }
+
+    private async Task RefreshPricesAsync()
+    {
+        priceBusy = true;
+        priceMessage = null;
+        try
+        {
+            var (n, msg) = await PriceDataService.RefreshMarketPricesAsync();
+            priceMessage = msg;
+        }
+        finally
+        {
+            priceBusy = false;
+        }
+    }
+
+    private async Task ImportCsvAsync()
+    {
+        csvBusy = true;
+        csvMessage = null;
+        csvError = false;
+        try
+        {
+            var (n, err) = await PriceDataService.ImportPricesFromCsvAsync(csvText);
+            if (err is not null)
+            {
+                csvError = true;
+                csvMessage = err;
+            }
+            else
+            {
+                csvMessage = $"{n} prix mis a jour.";
+            }
+        }
+        finally
+        {
+            csvBusy = false;
+        }
+    }
+
+    private async Task RunBacktestAsync()
+    {
+        if (backtestAssetId <= 0)
+        {
+            return;
+        }
+
+        backtestBusy = true;
+        backtestResult = null;
+        try
+        {
+            var p = Math.Clamp(smaPeriod, 5, 120);
+            backtestResult = await AnalyticsService.RunSmaTrendBacktestAsync(backtestAssetId, p, initialCash);
+        }
+        finally
+        {
+            backtestBusy = false;
+        }
+    }
+}
