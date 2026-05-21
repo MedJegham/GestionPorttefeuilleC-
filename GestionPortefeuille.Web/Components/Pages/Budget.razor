@@ -4,28 +4,42 @@
 
 <PageTitle>Budget</PageTitle>
 
-<h1 class="mb-3">Budget d'investissement</h1>
+<div class="page-header">
+    <i class="bi bi-wallet2"></i>
+    <h1>Budget d'investissement</h1>
+</div>
 
-<p class="text-muted">Ajustez le budget de reference et la liquidite disponible (utile pour une demo ou une reinitialisation).</p>
+<p class="text-muted mb-3"><i class="bi bi-info-circle me-1"></i>Ajustez le budget de reference et la liquidite disponible (utile pour une demo ou une reinitialisation).</p>
 
 @if (!string.IsNullOrWhiteSpace(statusMessage))
 {
-    <div class="alert alert-success">@statusMessage</div>
+    <div class="alert alert-success d-flex align-items-center gap-2">
+        <i class="bi bi-check-circle"></i>@statusMessage
+    </div>
 }
 
-<div class="card p-3" style="max-width: 520px;">
+<div class="card p-4" style="max-width: 540px;">
+    <div class="section-label"><i class="bi bi-sliders"></i>Parametres du budget</div>
     <EditForm Model="model" OnValidSubmit="SaveAsync">
         <DataAnnotationsValidator />
         <ValidationSummary />
         <div class="mb-3">
             <label class="form-label">Budget initial</label>
-            <InputNumber class="form-control" @bind-Value="model.InitialBudget" />
+            <div class="position-relative">
+                <i class="bi bi-cash position-absolute" style="left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--gp-text-subtle);"></i>
+                <InputNumber class="form-control" style="padding-left: 2.1rem;" @bind-Value="model.InitialBudget" />
+            </div>
         </div>
         <div class="mb-3">
             <label class="form-label">Liquidite disponible</label>
-            <InputNumber class="form-control" @bind-Value="model.AvailableCash" />
+            <div class="position-relative">
+                <i class="bi bi-cash-coin position-absolute" style="left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--gp-text-subtle);"></i>
+                <InputNumber class="form-control" style="padding-left: 2.1rem;" @bind-Value="model.AvailableCash" />
+            </div>
         </div>
-        <button class="btn btn-primary" type="submit">Enregistrer</button>
+        <button class="btn btn-primary d-flex align-items-center gap-1" type="submit">
+            <i class="bi bi-save"></i>Enregistrer
+        </button>
     </EditForm>
 </div>
 

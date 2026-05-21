@@ -12,6 +12,7 @@ public class TransactionService(AppDbContext dbContext, IPortfolioService portfo
     public Task<List<Transaction>> GetAllAsync(int? assetId = null)
     {
         var query = dbContext.Transactions
+            .AsNoTracking()
             .Include(t => t.Asset)
             .OrderByDescending(t => t.Date)
             .AsQueryable();
@@ -36,6 +37,7 @@ public class TransactionService(AppDbContext dbContext, IPortfolioService portfo
         pageSize = Math.Clamp(pageSize, 1, 100);
 
         var query = dbContext.Transactions
+            .AsNoTracking()
             .Include(t => t.Asset)
             .AsQueryable();
 

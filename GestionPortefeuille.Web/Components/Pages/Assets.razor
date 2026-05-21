@@ -1,16 +1,35 @@
 @page "/assets"
 @rendermode InteractiveServer
 @inject IAssetService AssetService
+@inject ToastService Toasts
+@inject ILogger<Assets> Logger
 
 <PageTitle>Actifs</PageTitle>
 
-<h1 class="mb-3">Gestion des actifs</h1>
+<div class="page-header">
+    <i class="bi bi-coin"></i>
+    <h1>Gestion des actifs</h1>
+</div>
+
+<ConfirmDialog @ref="confirmDialog" Title="Supprimer l'actif" />
+
+@if (loadError)
+{
+    <div class="alert alert-danger d-flex justify-content-between align-items-center">
+        <span>Echec du chargement des actifs.</span>
+        <button class="btn btn-sm btn-outline-light" @onclick="() => LoadPageAsync(page)">Reessayer</button>
+    </div>
+}
 
 <div class="card p-3 mb-3">
+    <div class="section-label"><i class="bi bi-funnel"></i>Filtres et recherche</div>
     <div class="row g-2 align-items-end">
         <div class="col-md-5">
-            <label class="form-label">Recherche (debounce ~400 ms)</label>
-            <input class="form-control" value="@searchDraft" @oninput="OnSearchInput" />
+            <label class="form-label">Recherche</label>
+            <div class="position-relative">
+                <i class="bi bi-search position-absolute" style="left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--gp-text-subtle); font-size: 0.85rem;"></i>
+                <input class="form-control" style="padding-left: 2.1rem;" value="@searchDraft" @oninput="OnSearchInput" placeholder="Symbole, nom..." />
+            </div>
         </div>
         <div class="col-md-3">
             <label class="form-label">Type</label>
@@ -39,15 +58,20 @@
     </div>
     <div class="row g-2 mt-2 align-items-end">
         <div class="col-md-2">
-            <button class="btn btn-primary w-100" @onclick="() => LoadPageAsync(1)">Appliquer</button>
+            <button class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-1" @onclick="() => LoadPageAsync(1)">
+                <i class="bi bi-check2"></i>Appliquer
+            </button>
         </div>
         <div class="col-md-2">
-            <button class="btn btn-outline-secondary w-100" @onclick="ResetForm">Nouveau</button>
+            <button class="btn btn-outline-secondary w-100 d-flex align-items-center justify-content-center gap-1" @onclick="ResetForm">
+                <i class="bi bi-plus-lg"></i>Nouveau
+            </button>
         </div>
     </div>
 </div>
 
 <div class="card p-3 mb-3">
+    <div class="section-label"><i class="bi bi-pencil-square"></i>@(assetForm.Id == 0 ? "Ajouter un actif" : $"Modifier {assetForm.Symbol}")</div>
     <EditForm Model="assetForm" OnValidSubmit="SaveAsync">
         <DataAnnotationsValidator />
         <ValidationSummary />
@@ -74,7 +98,10 @@
                 <InputNumber class="form-control" @bind-Value="assetForm.CurrentPrice" />
             </div>
             <div class="col-md-2 d-flex align-items-end">
-                <button class="btn btn-success w-100" type="submit">@((assetForm.Id == 0) ? "Ajouter" : "Mettre a jour")</button>
+                <button class="btn btn-success w-100 d-flex align-items-center justify-content-center gap-1" type="submit">
+                    <i class="bi @(assetForm.Id == 0 ? "bi-plus-lg" : "bi-check2")"></i>
+                    @((assetForm.Id == 0) ? "Ajouter" : "Mettre a jour")
+                </button>
             </div>
         </div>
     </EditForm>
@@ -82,38 +109,68 @@
 
 <div class="card p-3">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-        <span class="text-muted small">@totalCount actif(s) — @($"Page {page} / {totalPages}")</span>
+        <span class="text-muted small"><i class="bi bi-list-ul me-1"></i>@totalCount actif(s) &middot; @($"Page {page} / {totalPages}")</span>
         <div class="btn-group btn-group-sm">
-            <button class="btn btn-outline-secondary" disabled="@(page <= 1)" @onclick="() => LoadPageAsync(page - 1)">Prec.</button>
-            <button class="btn btn-outline-secondary" disabled="@(page >= totalPages)" @onclick="() => LoadPageAsync(page + 1)">Suiv.</button>
+            <button class="btn btn-outline-secondary" disabled="@(page <= 1)" @onclick="() => LoadPageAsync(page - 1)" title="Page precedente">
+                <i class="bi bi-chevron-left"></i>
+            </button>
+            <button class="btn btn-outline-secondary" disabled="@(page >= totalPages)" @onclick="() => LoadPageAsync(page + 1)" title="Page suivante">
+                <i class="bi bi-chevron-right"></i>
+            </button>
         </div>
     </div>
-    <table class="table table-hover align-middle">
-        <thead>
-            <tr>
-                <th>Symbole</th>
-                <th>Nom</th>
-                <th>Type</th>
-                <th>Prix</th>
-                <th class="text-end">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var asset in pageItems)
-            {
-                <tr>
-                    <td><strong>@asset.Symbol</strong></td>
-                    <td>@asset.Name</td>
-                    <td>@asset.AssetType</td>
-                    <td>@asset.CurrentPrice.ToString("C")</td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => Edit(asset)">Editer</button>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(asset.Id)">Supprimer</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    @if (isLoading)
+    {
+        <LoadingSpinner Message="Chargement des actifs..." />
+    }
+    else if (pageItems.Count == 0)
+    {
+        <div class="empty-state">
+            <i class="bi bi-collection empty-icon"></i>
+            <div class="empty-title">Aucun actif trouve</div>
+            <p class="empty-message">Renseignez le formulaire ci-dessus pour creer votre premier actif (action ou crypto).</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Symbole</th>
+                        <th>Nom</th>
+                        <th>Type</th>
+                        <th class="text-end">Prix</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var asset in pageItems)
+                    {
+                        <tr>
+                            <td><strong>@asset.Symbol</strong></td>
+                            <td class="text-muted">@asset.Name</td>
+                            <td>
+                                <span class="tag-signal @(asset.AssetType == AssetType.Crypto ? "bg-warning-subtle text-warning" : "bg-secondary-subtle")">
+                                    <i class="bi @(asset.AssetType == AssetType.Crypto ? "bi-currency-bitcoin" : "bi-building")"></i>
+                                    @asset.AssetType
+                                </span>
+                            </td>
+                            <td class="text-end tabular-nums fw-semibold">@asset.CurrentPrice.ToString("C")</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => Edit(asset)" title="Editer">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(asset)" title="Supprimer">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 </div>
 
 @code {
@@ -130,6 +187,9 @@
     private List<Asset> pageItems = [];
     private Asset assetForm = new() { AssetType = AssetType.Stock, CurrentPrice = 100m };
     private CancellationTokenSource? _searchDebounceCts;
+    private ConfirmDialog? confirmDialog;
+    private bool isLoading;
+    private bool loadError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -169,14 +229,29 @@
     private async Task LoadPageAsync(int newPage)
     {
         page = Math.Max(1, newPage);
-        var result = await AssetService.GetPagedAsync(search, typeFilter, page, PageSize, sortBy, sortDesc);
-        pageItems = result.Items;
-        totalCount = result.TotalCount;
-        if (page > totalPages && totalPages > 0)
+        isLoading = true;
+        loadError = false;
+        try
         {
-            page = totalPages;
-            result = await AssetService.GetPagedAsync(search, typeFilter, page, PageSize, sortBy, sortDesc);
+            var result = await AssetService.GetPagedAsync(search, typeFilter, page, PageSize, sortBy, sortDesc);
             pageItems = result.Items;
+            totalCount = result.TotalCount;
+            if (page > totalPages && totalPages > 0)
+            {
+                page = totalPages;
+                result = await AssetService.GetPagedAsync(search, typeFilter, page, PageSize, sortBy, sortDesc);
+                pageItems = result.Items;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Echec du chargement des actifs (page {Page})", page);
+            loadError = true;
+            Toasts.ShowError("Erreur", "Impossible de charger la liste des actifs.");
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
 
@@ -194,23 +269,55 @@
 
     private async Task SaveAsync()
     {
-        if (assetForm.Id == 0)
+        try
         {
-            await AssetService.CreateAsync(assetForm);
-        }
-        else
-        {
-            await AssetService.UpdateAsync(assetForm);
-        }
+            if (assetForm.Id == 0)
+            {
+                await AssetService.CreateAsync(assetForm);
+                Toasts.ShowSuccess("Actif ajoute", assetForm.Symbol);
+            }
+            else
+            {
+                await AssetService.UpdateAsync(assetForm);
+                Toasts.ShowSuccess("Actif mis a jour", assetForm.Symbol);
+            }
 
-        ResetForm();
-        await LoadPageAsync(page);
+            ResetForm();
+            await LoadPageAsync(page);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Echec de l'enregistrement de l'actif {Symbol}", assetForm.Symbol);
+            Toasts.ShowError("Erreur", "L'enregistrement a echoue.");
+        }
     }
 
-    private async Task DeleteAsync(int id)
+    private async Task DeleteAsync(Asset asset)
     {
-        await AssetService.DeleteAsync(id);
-        await LoadPageAsync(page);
+        if (confirmDialog is null)
+        {
+            return;
+        }
+
+        var confirmed = await confirmDialog.ShowAsync(
+            $"Voulez-vous vraiment supprimer l'actif {asset.Symbol} ? Cette action est irreversible.");
+
+        if (!confirmed)
+        {
+            return;
+        }
+
+        try
+        {
+            await AssetService.DeleteAsync(asset.Id);
+            Toasts.ShowSuccess("Actif supprime", asset.Symbol);
+            await LoadPageAsync(page);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Echec de la suppression de l'actif {AssetId}", asset.Id);
+            Toasts.ShowError("Erreur", "La suppression a echoue (l'actif a peut-etre des transactions liees).");
+        }
     }
 
     private void ResetForm()

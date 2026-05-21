@@ -76,7 +76,7 @@ public class AnalyticsService(AppDbContext dbContext) : IAnalyticsService
 
     public async Task EnsurePriceHistorySeedAsync(int days = 90)
     {
-        var assets = await dbContext.Assets.ToListAsync();
+        var assets = await dbContext.Assets.AsNoTracking().ToListAsync();
         if (assets.Count == 0)
         {
             return;

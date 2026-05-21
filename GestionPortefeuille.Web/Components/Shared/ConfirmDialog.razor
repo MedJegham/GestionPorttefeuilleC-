@@ -1,0 +1,65 @@
+@* Modal de confirmation reutilisable. Usage :
+    <ConfirmDialog @ref="confirmDialog" Title="..." OnConfirmed="..." />
+    puis : await confirmDialog.ShowAsync("Message a afficher"); *@
+
+@if (_visible)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="background-color: rgba(15, 30, 58, 0.6); backdrop-filter: blur(2px);">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content" style="border-radius: var(--gp-radius); border: 1px solid var(--gp-border); box-shadow: var(--gp-shadow-lg);">
+                <div class="modal-header" style="border-bottom: 1px solid var(--gp-border); background-color: var(--gp-navy-100);">
+                    <h5 class="modal-title d-flex align-items-center gap-2">
+                        <i class="bi @IconClass" style="color: var(--gp-@(ConfirmButtonStyle));"></i>
+                        @Title
+                    </h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="Cancel"></button>
+                </div>
+                <div class="modal-body py-4">
+                    <p class="mb-0">@_message</p>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid var(--gp-border);">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">
+                        <i class="bi bi-x-lg me-1"></i>@CancelLabel
+                    </button>
+                    <button type="button" class="btn btn-@ConfirmButtonStyle d-flex align-items-center gap-1" @onclick="Confirm">
+                        <i class="bi @ActionIconClass"></i>@ConfirmLabel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = "Confirmer";
+    [Parameter] public string ConfirmLabel { get; set; } = "Supprimer";
+    [Parameter] public string CancelLabel { get; set; } = "Annuler";
+    [Parameter] public string ConfirmButtonStyle { get; set; } = "danger";
+    [Parameter] public string IconClass { get; set; } = "bi-exclamation-triangle";
+    [Parameter] public string ActionIconClass { get; set; } = "bi-trash";
+
+    private bool _visible;
+    private string _message = string.Empty;
+    private TaskCompletionSource<bool>? _tcs;
+
+    public Task<bool> ShowAsync(string message)
+    {
+        _message = message;
+        _visible = true;
+        _tcs = new TaskCompletionSource<bool>();
+        StateHasChanged();
+        return _tcs.Task;
+    }
+
+    private void Confirm()
+    {
+        _visible = false;
+        _tcs?.TrySetResult(true);
+    }
+
+    private void Cancel()
+    {
+        _visible = false;
+        _tcs?.TrySetResult(false);
+    }
+}

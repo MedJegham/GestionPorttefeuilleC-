@@ -6,6 +6,7 @@ using GestionPortefeuille.Core.Options;
 using GestionPortefeuille.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace GestionPortefeuille.Services;
@@ -14,7 +15,8 @@ public class PriceDataService(
     HttpClient httpClient,
     AppDbContext dbContext,
     IMemoryCache cache,
-    IOptions<PriceDataOptions> options) : IPriceDataService
+    IOptions<PriceDataOptions> options,
+    ILogger<PriceDataService> logger) : IPriceDataService
 {
     private static readonly Dictionary<string, string> CryptoGeckoIds = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -30,6 +32,8 @@ public class PriceDataService(
         var opt = options.Value;
         var mode = (opt.Mode ?? "Simulated").Trim();
 
+        logger.LogInformation("Demarrage RefreshMarketPricesAsync (mode={Mode})", mode);
+
         if (string.Equals(mode, "Simulated", StringComparison.OrdinalIgnoreCase))
         {
             return (0, "Mode simule: les cours ne sont pas mis a jour via API (utilisez l'import CSV ou la saisie manuelle).");
@@ -42,12 +46,14 @@ public class PriceDataService(
 
         if (!string.Equals(mode, "Api", StringComparison.OrdinalIgnoreCase))
         {
+            logger.LogWarning("Mode inconnu pour PriceData: {Mode}", opt.Mode);
             return (0, $"Mode inconnu '{opt.Mode}'. Utilisez Simulated, Api ou None.");
         }
 
         var assets = await dbContext.Assets.ToListAsync(cancellationToken);
         if (assets.Count == 0)
         {
+            logger.LogInformation("Aucun actif a mettre a jour");
             return (0, "Aucun actif a mettre a jour.");
         }
 
@@ -68,9 +74,11 @@ public class PriceDataService(
             if (!cache.TryGetValue<decimal>(cacheKey, out var usd))
             {
                 var url = $"https://api.coingecko.com/api/v3/simple/price?ids={Uri.EscapeDataString(id)}&vs_currencies=usd";
+                logger.LogDebug("Appel CoinGecko pour {GeckoId}", id);
                 using var response = await httpClient.GetAsync(url, cancellationToken);
                 if (!response.IsSuccessStatusCode)
                 {
+                    logger.LogWarning("CoinGecko a retourne {StatusCode} pour {GeckoId}", (int)response.StatusCode, id);
                     continue;
                 }
 
@@ -80,6 +88,7 @@ public class PriceDataService(
                     !idNode.TryGetProperty("usd", out var usdNode) ||
                     usdNode.ValueKind != JsonValueKind.Number)
                 {
+                    logger.LogWarning("Reponse CoinGecko invalide pour {GeckoId}", id);
                     continue;
                 }
 
@@ -115,9 +124,11 @@ public class PriceDataService(
             }
 
             var url = $"https://finnhub.io/api/v1/quote?symbol={Uri.EscapeDataString(sym)}&token={Uri.EscapeDataString(key)}";
+            logger.LogDebug("Appel Finnhub pour {Symbol}", sym);
             using var response = await httpClient.GetAsync(url, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
+                logger.LogWarning("Finnhub a retourne {StatusCode} pour {Symbol}", (int)response.StatusCode, sym);
                 continue;
             }
 
@@ -125,12 +136,14 @@ public class PriceDataService(
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             if (!doc.RootElement.TryGetProperty("c", out var c) || c.ValueKind != JsonValueKind.Number)
             {
+                logger.LogWarning("Reponse Finnhub invalide pour {Symbol}", sym);
                 continue;
             }
 
             var p = c.GetDecimal();
             if (p <= 0)
             {
+                logger.LogDebug("Prix Finnhub <= 0 pour {Symbol}, ignore", sym);
                 continue;
             }
 
@@ -140,6 +153,7 @@ public class PriceDataService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("RefreshMarketPricesAsync termine: {Count} cours mis a jour", updated);
         return (updated, $"{updated} cours mis a jour via API.");
     }
 
@@ -201,10 +215,12 @@ public class PriceDataService(
 
         if (updated == 0)
         {
+            logger.LogWarning("Import CSV: aucune ligne reconnue ({Lines} lignes parsees)", lines.Length - start);
             return (0, "Aucune ligne reconnue (format: Symbole;Prix ou Symbol,Price).");
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Import CSV termine: {Count} prix mis a jour", updated);
         return (updated, null);
     }
 }

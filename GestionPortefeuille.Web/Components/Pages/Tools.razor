@@ -5,47 +5,56 @@
 @inject IAnalyticsService AnalyticsService
 @inject IAssetService AssetService
 @inject IConfiguration Configuration
+@inject ToastService Toasts
+@inject ILogger<Tools> Logger
 
 <PageTitle>Outils</PageTitle>
 
-<h1 class="mb-3">Outils marches et backtest</h1>
+<div class="page-header">
+    <i class="bi bi-sliders"></i>
+    <h1>Outils marches et backtest</h1>
+</div>
 
 <div class="card p-3 mb-3">
-    <h5>Configuration</h5>
+    <h5 class="d-flex align-items-center gap-2"><i class="bi bi-gear text-muted"></i>Configuration</h5>
     <ul class="small text-muted mb-0">
         <li><strong>PriceData:Mode</strong> = <code>@Configuration["PriceData:Mode"]</code> — <em>Simulated</em> (defaut), <em>Api</em> (Finnhub + CoinGecko), <em>None</em>.</li>
-        <li>Actions : renseignez <code>PriceData:FinnhubApiKey</code> dans <code>appsettings.json</code> (compte gratuit sur finnhub.io).</li>
+        <li>Actions : renseignez <code>PriceData:FinnhubApiKey</code> via <code>dotnet user-secrets set "PriceData:FinnhubApiKey" "votre-cle"</code> (compte gratuit sur finnhub.io).</li>
         <li>Crypto : BTC, ETH, SOL, ADA, DOT sont mappees vers CoinGecko (sans cle).</li>
     </ul>
 </div>
 
 <div class="card p-3 mb-3">
-    <h5 class="mb-2">Rafraichir les cours (API)</h5>
+    <h5 class="d-flex align-items-center gap-2"><i class="bi bi-cloud-arrow-down text-muted"></i>Rafraichir les cours (API)</h5>
     <p class="small text-muted">Respecte le cache (minutes) configure dans <code>PriceData:CacheMinutes</code>.</p>
     @if (!string.IsNullOrEmpty(priceMessage))
     {
-        <div class="alert alert-info small">@priceMessage</div>
+        <div class="alert alert-info small d-flex align-items-center gap-2"><i class="bi bi-info-circle"></i>@priceMessage</div>
     }
-    <button class="btn btn-primary" type="button" disabled="@priceBusy" @onclick="RefreshPricesAsync">
+    <button class="btn btn-primary d-flex align-items-center gap-1" type="button" disabled="@priceBusy" @onclick="RefreshPricesAsync">
+        <i class="bi @(priceBusy ? "bi-hourglass-split" : "bi-arrow-clockwise")"></i>
         @(priceBusy ? "En cours..." : "Rafraichir via API")
     </button>
 </div>
 
 <div class="card p-3 mb-3">
-    <h5 class="mb-2">Import CSV des prix</h5>
+    <h5 class="d-flex align-items-center gap-2"><i class="bi bi-filetype-csv text-muted"></i>Import CSV des prix</h5>
     <p class="small text-muted">Une ligne par actif : <code>Symbole;Prix</code> ou <code>Symbol,Price</code>. Le symbole doit exister.</p>
     <textarea class="form-control font-monospace small mb-2" rows="6" @bind="csvText" placeholder="AAPL;190.5&#10;BTC;62000"></textarea>
     @if (!string.IsNullOrEmpty(csvMessage))
     {
-        <div class="alert @(csvError ? "alert-danger" : "alert-success") small">@csvMessage</div>
+        <div class="alert @(csvError ? "alert-danger" : "alert-success") small d-flex align-items-center gap-2">
+            <i class="bi @(csvError ? "bi-exclamation-triangle" : "bi-check-circle")"></i>@csvMessage
+        </div>
     }
-    <button class="btn btn-outline-primary" type="button" disabled="@csvBusy" @onclick="ImportCsvAsync">
+    <button class="btn btn-outline-primary d-flex align-items-center gap-1" type="button" disabled="@csvBusy" @onclick="ImportCsvAsync">
+        <i class="bi @(csvBusy ? "bi-hourglass-split" : "bi-upload")"></i>
         @(csvBusy ? "Import..." : "Importer")
     </button>
 </div>
 
 <div class="card p-3">
-    <h5 class="mb-2">Backtest SMA (regle simple)</h5>
+    <h5 class="d-flex align-items-center gap-2"><i class="bi bi-graph-up-arrow text-muted"></i>Backtest SMA (regle simple)</h5>
     <p class="small text-muted">@BacktestRuleText</p>
     <div class="row g-2 align-items-end">
         <div class="col-md-4">
@@ -67,7 +76,8 @@
             <InputNumber class="form-control" @bind-Value="initialCash" />
         </div>
         <div class="col-md-3">
-            <button class="btn btn-success w-100" type="button" disabled="@backtestBusy" @onclick="RunBacktestAsync">
+            <button class="btn btn-success w-100 d-flex align-items-center justify-content-center gap-1" type="button" disabled="@backtestBusy" @onclick="RunBacktestAsync">
+                <i class="bi @(backtestBusy ? "bi-hourglass-split" : "bi-play-fill")"></i>
                 @(backtestBusy ? "Calcul..." : "Lancer")
             </button>
         </div>
@@ -75,12 +85,18 @@
     @if (backtestResult is not null)
     {
         <hr />
-        <dl class="row small mb-0">
-            <dt class="col-sm-4">Strategie (fin)</dt>
-            <dd class="col-sm-8">@backtestResult.FinalStrategyEquity.ToString("C") (@backtestResult.TradeCount operations)</dd>
-            <dt class="col-sm-4">Buy &amp; hold (fin)</dt>
-            <dd class="col-sm-8">@backtestResult.FinalBuyHoldEquity.ToString("C")</dd>
-        </dl>
+        <div class="row g-3 mt-1">
+            <div class="col-md-6">
+                <div class="section-label"><i class="bi bi-cpu"></i>Strategie SMA</div>
+                <div class="kpi-value tabular-nums">@backtestResult.FinalStrategyEquity.ToString("C")</div>
+                <div class="text-muted small">@backtestResult.TradeCount operation(s)</div>
+            </div>
+            <div class="col-md-6">
+                <div class="section-label"><i class="bi bi-bookmark-star"></i>Buy &amp; Hold</div>
+                <div class="kpi-value tabular-nums">@backtestResult.FinalBuyHoldEquity.ToString("C")</div>
+                <div class="text-muted small">Reference passive</div>
+            </div>
+        </div>
     }
 </div>
 
@@ -113,6 +129,20 @@
         {
             var (n, msg) = await PriceDataService.RefreshMarketPricesAsync();
             priceMessage = msg;
+            if (n > 0)
+            {
+                Toasts.ShowSuccess("Cours mis a jour", $"{n} actif(s) actualise(s).");
+            }
+            else
+            {
+                Toasts.ShowInfo("Aucune mise a jour", msg);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Echec du rafraichissement des cours");
+            priceMessage = "Echec du rafraichissement.";
+            Toasts.ShowError("Erreur API", "L'appel au fournisseur de cours a echoue. Reessayez plus tard.");
         }
         finally
         {
@@ -132,11 +162,20 @@
             {
                 csvError = true;
                 csvMessage = err;
+                Toasts.ShowWarning("Import CSV", err);
             }
             else
             {
                 csvMessage = $"{n} prix mis a jour.";
+                Toasts.ShowSuccess("Import CSV", $"{n} prix mis a jour.");
             }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Echec de l'import CSV");
+            csvError = true;
+            csvMessage = "Echec de l'import.";
+            Toasts.ShowError("Erreur", "Import CSV impossible.");
         }
         finally
         {
@@ -157,6 +196,11 @@
         {
             var p = Math.Clamp(smaPeriod, 5, 120);
             backtestResult = await AnalyticsService.RunSmaTrendBacktestAsync(backtestAssetId, p, initialCash);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Echec du backtest (asset {AssetId})", backtestAssetId);
+            Toasts.ShowError("Erreur", "Le backtest a echoue.");
         }
         finally
         {

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
     <ProjectReference Include="..\GestionPortefeuille.Core\GestionPortefeuille.Core.csproj" />
@@ -15,6 +15,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>f62e8d65-3931-4b2e-b188-4a7ad53d755d</UserSecretsId>
   </PropertyGroup>
 
 </Project>

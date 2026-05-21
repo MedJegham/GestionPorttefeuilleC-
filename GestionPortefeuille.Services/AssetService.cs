@@ -61,7 +61,7 @@ public class AssetService(AppDbContext dbContext) : IAssetService
 
     private IQueryable<Asset> BuildFilteredQuery(string? search, string? typeFilter)
     {
-        var query = dbContext.Assets.AsQueryable();
+        var query = dbContext.Assets.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
         {

@@ -3,26 +3,54 @@
 @inject ITransactionService TransactionService
 @inject IAssetService AssetService
 @inject IPortfolioService PortfolioService
+@inject ToastService Toasts
+@inject ILogger<Transactions> Logger
 
 <PageTitle>Transactions</PageTitle>
 
-<h1 class="mb-3">Transactions</h1>
+<div class="page-header">
+    <i class="bi bi-arrow-left-right"></i>
+    <h1>Transactions</h1>
+</div>
+
+<ConfirmDialog @ref="confirmDialog" Title="Supprimer la transaction" />
 
 @if (!string.IsNullOrWhiteSpace(statusMessage))
 {
     <div class="alert @(isSuccess ? "alert-success" : "alert-danger")">@statusMessage</div>
 }
 
-<div class="card p-3 mb-3">
-    <h5>Budget d'investissement</h5>
-    <div class="row g-2">
-        <div class="col-md-4"><div class="text-muted small">Budget initial</div><div class="fw-bold">@budget.InitialBudget.ToString("C")</div></div>
-        <div class="col-md-4"><div class="text-muted small">Liquidite disponible</div><div class="fw-bold">@budget.AvailableCash.ToString("C")</div></div>
-        <div class="col-md-4"><div class="text-muted small">Valeur totale</div><div class="fw-bold">@snapshot.TotalValue.ToString("C")</div></div>
+@if (initialLoadError)
+{
+    <div class="alert alert-danger d-flex justify-content-between align-items-center">
+        <span>Echec du chargement des donnees.</span>
+        <button class="btn btn-sm btn-outline-light" @onclick="LoadAllAsync">Reessayer</button>
+    </div>
+}
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="card kpi-card kpi-accent p-3">
+            <div class="kpi-label"><i class="bi bi-wallet2"></i>Budget initial</div>
+            <div class="kpi-value">@budget.InitialBudget.ToString("C")</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card kpi-card p-3">
+            <div class="kpi-label"><i class="bi bi-cash-coin"></i>Liquidite disponible</div>
+            <div class="kpi-value">@budget.AvailableCash.ToString("C")</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card kpi-card p-3">
+            <div class="kpi-label"><i class="bi bi-graph-up"></i>Valeur totale</div>
+            <div class="kpi-value">@snapshot.TotalValue.ToString("C")</div>
+        </div>
     </div>
 </div>
 
 <div class="card p-3 mb-3">
+    <div class="section-label"><i class="bi bi-plus-circle"></i>Nouvelle transaction</div>
     <EditForm Model="transactionForm" OnValidSubmit="SaveAsync">
         <DataAnnotationsValidator />
         <ValidationSummary />
@@ -53,7 +81,9 @@
                 <InputNumber class="form-control" @bind-Value="transactionForm.UnitPrice" />
             </div>
             <div class="col-md-3 d-flex align-items-end">
-                <button class="btn btn-primary w-100" type="submit">Enregistrer transaction</button>
+                <button class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-1" type="submit">
+                    <i class="bi bi-save"></i>Enregistrer
+                </button>
             </div>
         </div>
     </EditForm>
@@ -62,8 +92,8 @@
 <div class="card p-3">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
         <div>
-            <h5 class="mb-0 d-inline">Historique des operations</h5>
-            <span class="text-muted small ms-2">@totalCount operation(s) — @($"Page {page} / {totalPages}")</span>
+            <h5 class="mb-0 d-flex align-items-center gap-2"><i class="bi bi-clock-history text-muted"></i>Historique des operations</h5>
+            <span class="text-muted small mt-1 d-block">@totalCount operation(s) &middot; @($"Page {page} / {totalPages}")</span>
         </div>
         <div class="d-flex flex-wrap gap-2 align-items-center">
             <select class="form-select form-select-sm" style="width: auto;" @bind="sortBy" @bind:after="() => LoadPageAsync(1)">
@@ -78,47 +108,73 @@
             </div>
             @if (!string.IsNullOrEmpty(csvDownloadHref))
             {
-                <a class="btn btn-sm btn-outline-secondary" href="@csvDownloadHref" download="transactions.csv">Exporter CSV</a>
+                <a class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" href="@csvDownloadHref" download="transactions.csv">
+                    <i class="bi bi-download"></i>CSV
+                </a>
             }
             <div class="btn-group btn-group-sm">
-                <button class="btn btn-outline-secondary" disabled="@(page <= 1)" @onclick="() => LoadPageAsync(page - 1)">Prec.</button>
-                <button class="btn btn-outline-secondary" disabled="@(page >= totalPages)" @onclick="() => LoadPageAsync(page + 1)">Suiv.</button>
+                <button class="btn btn-outline-secondary" disabled="@(page <= 1)" @onclick="() => LoadPageAsync(page - 1)" title="Page precedente">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                <button class="btn btn-outline-secondary" disabled="@(page >= totalPages)" @onclick="() => LoadPageAsync(page + 1)" title="Page suivante">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
             </div>
         </div>
     </div>
-    <table class="table table-sm table-hover align-middle">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Actif</th>
-                <th>Type</th>
-                <th>Qte</th>
-                <th>Prix</th>
-                <th>Montant</th>
-                <th class="text-end">Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var t in pageItems)
-            {
-                <tr>
-                    <td>@t.Date.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
-                    <td>@t.Asset?.Symbol</td>
-                    <td>
-                        <span class="badge @(t.Type == TransactionType.Buy ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning")">
-                            @t.Type
-                        </span>
-                    </td>
-                    <td>@t.Quantity</td>
-                    <td>@t.UnitPrice.ToString("C")</td>
-                    <td>@t.TotalAmount.ToString("C")</td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(t.Id)">Supprimer</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    @if (isLoading)
+    {
+        <LoadingSpinner Message="Chargement des transactions..." />
+    }
+    else if (pageItems.Count == 0)
+    {
+        <div class="empty-state">
+            <i class="bi bi-receipt empty-icon"></i>
+            <div class="empty-title">Aucune transaction enregistree</div>
+            <p class="empty-message">Achetez ou vendez un actif pour faire apparaitre l'historique ici.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Actif</th>
+                        <th>Type</th>
+                        <th class="text-end">Quantite</th>
+                        <th class="text-end">Prix</th>
+                        <th class="text-end">Montant</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in pageItems)
+                    {
+                        <tr>
+                            <td class="text-muted small tabular-nums">@t.Date.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td><strong>@t.Asset?.Symbol</strong></td>
+                            <td>
+                                <span class="tag-signal @(t.Type == TransactionType.Buy ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning")">
+                                    <i class="bi @(t.Type == TransactionType.Buy ? "bi-arrow-down-left" : "bi-arrow-up-right")"></i>
+                                    @t.Type
+                                </span>
+                            </td>
+                            <td class="text-end tabular-nums">@t.Quantity</td>
+                            <td class="text-end tabular-nums">@t.UnitPrice.ToString("C")</td>
+                            <td class="text-end tabular-nums fw-semibold">@t.TotalAmount.ToString("C")</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(t)" title="Supprimer">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 </div>
 
 @code {
@@ -137,6 +193,9 @@
     private bool isSuccess;
     private string? statusMessage;
     private string? csvDownloadHref;
+    private ConfirmDialog? confirmDialog;
+    private bool isLoading;
+    private bool initialLoadError;
 
     private Transaction transactionForm = new()
     {
@@ -150,15 +209,48 @@
 
     private async Task LoadAllAsync()
     {
-        assets = await AssetService.GetAllAsync();
-        budget = await PortfolioService.GetBudgetAsync();
-        snapshot = await PortfolioService.GetSnapshotAsync();
-        allTransactionsExport = await TransactionService.GetAllAsync();
-        await LoadPageAsync(page);
-        BuildCsvHref();
+        isLoading = true;
+        initialLoadError = false;
+        try
+        {
+            assets = await AssetService.GetAllAsync();
+            budget = await PortfolioService.GetBudgetAsync();
+            snapshot = await PortfolioService.GetSnapshotAsync();
+            allTransactionsExport = await TransactionService.GetAllAsync();
+            await LoadPageInternalAsync(page);
+            BuildCsvHref();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Echec du chargement des transactions");
+            initialLoadError = true;
+            Toasts.ShowError("Erreur", "Impossible de charger les transactions.");
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private async Task LoadPageAsync(int newPage)
+    {
+        isLoading = true;
+        try
+        {
+            await LoadPageInternalAsync(newPage);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Echec du chargement de la page {Page}", newPage);
+            Toasts.ShowError("Erreur", "Impossible de charger la page.");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadPageInternalAsync(int newPage)
     {
         page = Math.Max(1, newPage);
         var result = await TransactionService.GetPagedAsync(page, PageSize, sortBy, sortDesc, null);
@@ -200,30 +292,67 @@
         {
             isSuccess = false;
             statusMessage = "Veuillez choisir un actif.";
+            Toasts.ShowWarning("Validation", "Veuillez choisir un actif.");
             return;
         }
 
-        var result = await TransactionService.CreateAsync(transactionForm);
-        isSuccess = result.Success;
-        statusMessage = result.Message;
-
-        if (result.Success)
+        try
         {
-            transactionForm = new Transaction
-            {
-                Type = TransactionType.Buy,
-                Quantity = 1,
-                UnitPrice = 100,
-                Date = DateTime.UtcNow
-            };
-        }
+            var result = await TransactionService.CreateAsync(transactionForm);
+            isSuccess = result.Success;
+            statusMessage = result.Message;
 
-        await LoadAllAsync();
+            if (result.Success)
+            {
+                Toasts.ShowSuccess("Transaction enregistree", result.Message);
+                transactionForm = new Transaction
+                {
+                    Type = TransactionType.Buy,
+                    Quantity = 1,
+                    UnitPrice = 100,
+                    Date = DateTime.UtcNow
+                };
+            }
+            else
+            {
+                Toasts.ShowWarning("Transaction refusee", result.Message);
+            }
+
+            await LoadAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Echec de l'enregistrement de la transaction (AssetId={AssetId})", transactionForm.AssetId);
+            Toasts.ShowError("Erreur", "L'enregistrement a echoue.");
+        }
     }
 
-    private async Task DeleteAsync(int id)
+    private async Task DeleteAsync(Transaction t)
     {
-        await TransactionService.DeleteAsync(id);
-        await LoadAllAsync();
+        if (confirmDialog is null)
+        {
+            return;
+        }
+
+        var label = $"{t.Type} {t.Quantity} {t.Asset?.Symbol} @ {t.UnitPrice:C}";
+        var confirmed = await confirmDialog.ShowAsync(
+            $"Voulez-vous vraiment supprimer la transaction : {label} ? Cette action est irreversible.");
+
+        if (!confirmed)
+        {
+            return;
+        }
+
+        try
+        {
+            await TransactionService.DeleteAsync(t.Id);
+            Toasts.ShowSuccess("Transaction supprimee", label);
+            await LoadAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Echec de la suppression de la transaction {Id}", t.Id);
+            Toasts.ShowError("Erreur", "La suppression a echoue.");
+        }
     }
 }

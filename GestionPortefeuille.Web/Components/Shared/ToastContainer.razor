@@ -1,0 +1,50 @@
+@using GestionPortefeuille.Web.Services
+@inject ToastService Toasts
+@implements IDisposable
+
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+    @foreach (var msg in Toasts.Messages)
+    {
+        <div class="toast show align-items-center border-0 mb-2"
+             role="alert" aria-live="assertive" aria-atomic="true"
+             style="@ToastStyle(msg.Level)">
+            <div class="d-flex">
+                <div class="toast-body d-flex align-items-start gap-2">
+                    <i class="bi @LevelIcon(msg.Level)" style="font-size: 1.15rem;"></i>
+                    <div>
+                        <strong>@msg.Title</strong>
+                        @if (!string.IsNullOrWhiteSpace(msg.Body))
+                        {
+                            <div class="small mt-1" style="opacity: 0.85;">@msg.Body</div>
+                        }
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Close" @onclick="() => Toasts.Dismiss(msg.Id)"></button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => Toasts.OnChange += HandleChange;
+
+    private void HandleChange() => InvokeAsync(StateHasChanged);
+
+    private static string ToastStyle(ToastLevel level) => level switch
+    {
+        ToastLevel.Success => "background-color: #2f855a; color: #fff; border-radius: 8px; box-shadow: 0 8px 24px rgba(47, 133, 90, 0.25);",
+        ToastLevel.Warning => "background-color: #c05621; color: #fff; border-radius: 8px; box-shadow: 0 8px 24px rgba(192, 86, 33, 0.25);",
+        ToastLevel.Error => "background-color: #c53030; color: #fff; border-radius: 8px; box-shadow: 0 8px 24px rgba(197, 48, 48, 0.25);",
+        _ => "background-color: #1a365d; color: #fff; border-radius: 8px; box-shadow: 0 8px 24px rgba(26, 54, 93, 0.25);"
+    };
+
+    private static string LevelIcon(ToastLevel level) => level switch
+    {
+        ToastLevel.Success => "bi-check-circle-fill",
+        ToastLevel.Warning => "bi-exclamation-triangle-fill",
+        ToastLevel.Error => "bi-exclamation-octagon-fill",
+        _ => "bi-info-circle-fill"
+    };
+
+    public void Dispose() => Toasts.OnChange -= HandleChange;
+}
