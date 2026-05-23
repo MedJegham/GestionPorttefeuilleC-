@@ -159,14 +159,13 @@ public class TransactionService(AppDbContext dbContext, IPortfolioService portfo
 
     private async Task<decimal> GetOwnedQuantityAsync(int assetId)
     {
-        var buys = await dbContext.Transactions
-            .Where(t => t.AssetId == assetId && t.Type == TransactionType.Buy)
-            .SumAsync(t => t.Quantity);
+        var entries = await dbContext.Transactions
+            .Where(t => t.AssetId == assetId)
+            .Select(t => new { t.Type, t.Quantity })
+            .ToListAsync();
 
-        var sells = await dbContext.Transactions
-            .Where(t => t.AssetId == assetId && t.Type == TransactionType.Sell)
-            .SumAsync(t => t.Quantity);
-
+        var buys = entries.Where(e => e.Type == TransactionType.Buy).Sum(e => e.Quantity);
+        var sells = entries.Where(e => e.Type == TransactionType.Sell).Sum(e => e.Quantity);
         return buys - sells;
     }
 }

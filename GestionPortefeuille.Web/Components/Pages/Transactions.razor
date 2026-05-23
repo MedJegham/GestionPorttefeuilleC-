@@ -68,8 +68,8 @@
             <div class="col-md-2">
                 <label class="form-label">Type</label>
                 <InputSelect class="form-select" @bind-Value="transactionForm.Type">
-                    <option value="@TransactionType.Buy">Buy</option>
-                    <option value="@TransactionType.Sell">Sell</option>
+                    <option value="Buy">Buy</option>
+                    <option value="Sell">Sell</option>
                 </InputSelect>
             </div>
             <div class="col-md-2">
@@ -307,6 +307,7 @@
                 Toasts.ShowSuccess("Transaction enregistree", result.Message);
                 transactionForm = new Transaction
                 {
+                    AssetId = transactionForm.AssetId,
                     Type = TransactionType.Buy,
                     Quantity = 1,
                     UnitPrice = 100,
